@@ -1,0 +1,355 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container">
+    <h1 class="mb-4">VPN Tunnel Configuration</h1>
+    
+    <!-- Configuration Form -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-body">
+                    <h5 class="card-title mb-3">AWS Endpoint Configuration</h5>
+                    
+                    <form id="configForm">
+                        <!-- AWS Endpoint -->
+                        <div class="mb-3">
+                            <label for="awsEndpoint" class="form-label">AWS Endpoint Address</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-server"></i></span>
+                                <input type="text" class="form-control" id="awsEndpoint" 
+                                       placeholder="example.com:51820" 
+                                       value="{{ config.aws_endpoint }}">
+                            </div>
+                            <div class="form-text">The public address and port of your AWS instance (e.g. ec2-1-2-3-4.compute-1.amazonaws.com:51820)</div>
+                        </div>
+                        
+                        <!-- AWS Public Key -->
+                        <div class="mb-3">
+                            <label for="awsPublicKey" class="form-label">AWS Public Key</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-key"></i></span>
+                                <input type="text" class="form-control" id="awsPublicKey" 
+                                       placeholder="AWS WireGuard public key" 
+                                       value="{{ config.aws_public_key }}">
+                            </div>
+                            <div class="form-text">The public key from your AWS WireGuard server configuration</div>
+                        </div>
+                        
+                        <hr class="my-4">
+                        <h5 class="mb-3">Local Configuration</h5>
+                        
+                        <!-- Local Private Key -->
+                        <div class="mb-3">
+                            <label for="localPrivateKey" class="form-label">Local Private Key</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-lock"></i></span>
+                                <input type="text" class="form-control" id="localPrivateKey" 
+                                       placeholder="Your WireGuard private key" 
+                                       value="{{ config.local_private_key }}">
+                                <button class="btn btn-outline-secondary" type="button" id="generateKeyBtn">
+                                    <i class="fas fa-sync-alt"></i> Generate
+                                </button>
+                            </div>
+                            <div class="form-text">Your local WireGuard private key. Keep this secret!</div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <!-- Local IP -->
+                                <div class="mb-3">
+                                    <label for="localIP" class="form-label">Local Tunnel IP</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="fas fa-network-wired"></i></span>
+                                        <input type="text" class="form-control" id="localIP" 
+                                               placeholder="10.0.0.2/24" 
+                                               value="{{ config.local_ip }}">
+                                    </div>
+                                    <div class="form-text">The IP address assigned to your local WireGuard interface</div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <!-- DNS Servers -->
+                                <div class="mb-3">
+                                    <label for="dns" class="form-label">DNS Servers</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="fas fa-globe"></i></span>
+                                        <input type="text" class="form-control" id="dns" 
+                                               placeholder="1.1.1.1, 8.8.8.8" 
+                                               value="{{ config.dns }}">
+                                    </div>
+                                    <div class="form-text">DNS servers to use when the tunnel is active</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <!-- Keepalive Interval -->
+                                <div class="mb-3">
+                                    <label for="keepAlive" class="form-label">Keepalive Interval (seconds)</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="fas fa-heartbeat"></i></span>
+                                        <input type="number" class="form-control" id="keepAlive" 
+                                               placeholder="25" 
+                                               value="{{ config.keep_alive }}">
+                                    </div>
+                                    <div class="form-text">How often to send keepalive packets to maintain the connection</div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <!-- Auto Reconnect -->
+                                <div class="mb-3">
+                                    <div class="form-check form-switch mt-4 pt-2">
+                                        <input class="form-check-input" type="checkbox" id="autoReconnect" 
+                                               {% if config.auto_reconnect %}checked{% endif %}>
+                                        <label class="form-check-label" for="autoReconnect">
+                                            Automatically reconnect if connection drops
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Action Buttons -->
+                        <div class="d-flex justify-content-end mt-4">
+                            <button type="button" class="btn btn-secondary me-2" id="resetBtn">
+                                <i class="fas fa-undo me-2"></i>Reset
+                            </button>
+                            <button type="submit" class="btn btn-primary" id="saveBtn">
+                                <i class="fas fa-save me-2"></i>Save Configuration
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- AWS Setup Instructions -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-transparent">
+                    <h5 class="mb-0">AWS Setup Instructions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <h6><i class="fas fa-info-circle me-2"></i>Setting up WireGuard on AWS EC2</h6>
+                        <p>Follow these steps to set up a WireGuard server on your AWS EC2 instance:</p>
+                    </div>
+                    
+                    <ol class="list-group list-group-numbered mb-4">
+                        <li class="list-group-item d-flex justify-content-between align-items-start">
+                            <div class="ms-2 me-auto">
+                                <div class="fw-bold">Launch an EC2 instance</div>
+                                Choose a recent Ubuntu AMI (20.04 or newer) and ensure it has a public IP address
+                            </div>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-start">
+                            <div class="ms-2 me-auto">
+                                <div class="fw-bold">Configure security groups</div>
+                                Allow inbound UDP traffic on port 51820 (the default WireGuard port)
+                            </div>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-start">
+                            <div class="ms-2 me-auto">
+                                <div class="fw-bold">Install WireGuard</div>
+                                <code>sudo apt update && sudo apt install -y wireguard</code>
+                            </div>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-start">
+                            <div class="ms-2 me-auto">
+                                <div class="fw-bold">Generate keys</div>
+                                <code>wg genkey | tee privatekey | wg pubkey > publickey</code>
+                            </div>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-start">
+                            <div class="ms-2 me-auto">
+                                <div class="fw-bold">Create WireGuard configuration</div>
+                                <code>sudo nano /etc/wireguard/wg0.conf</code><br>
+                                <pre class="mt-2 bg-dark text-light p-3 rounded">
+[Interface]
+PrivateKey = [AWS-SERVER-PRIVATE-KEY]
+Address = 10.0.0.1/24
+ListenPort = 51820
+PostUp = iptables -A FORWARD -i wg0 -j ACCEPT; iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+PostDown = iptables -D FORWARD -i wg0 -j ACCEPT; iptables -t nat -D POSTROUTING -o eth0 -j MASQUERADE
+
+[Peer]
+PublicKey = [YOUR-LOCAL-PUBLIC-KEY]
+AllowedIPs = 10.0.0.2/32
+                                </pre>
+                            </div>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-start">
+                            <div class="ms-2 me-auto">
+                                <div class="fw-bold">Enable IP forwarding</div>
+                                <code>echo "net.ipv4.ip_forward=1" | sudo tee -a /etc/sysctl.conf && sudo sysctl -p</code>
+                            </div>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-start">
+                            <div class="ms-2 me-auto">
+                                <div class="fw-bold">Start WireGuard</div>
+                                <code>sudo systemctl enable wg-quick@wg0 && sudo systemctl start wg-quick@wg0</code>
+                            </div>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-start">
+                            <div class="ms-2 me-auto">
+                                <div class="fw-bold">Configure this application</div>
+                                Enter your AWS instance's public IP address and the server's public key in the form above
+                            </div>
+                        </li>
+                    </ol>
+                    
+                    <div class="alert alert-warning">
+                        <h6><i class="fas fa-exclamation-triangle me-2"></i>Important Security Notes</h6>
+                        <ul class="mb-0">
+                            <li>Keep your private keys secure and never share them</li>
+                            <li>Consider setting up firewall rules on your AWS instance to limit access</li>
+                            <li>Regularly update your EC2 instance to receive security patches</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const configForm = document.getElementById('configForm');
+        const generateKeyBtn = document.getElementById('generateKeyBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        
+        // Generate key pair
+        generateKeyBtn.addEventListener('click', () => {
+            // Show loading state
+            generateKeyBtn.disabled = true;
+            generateKeyBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Generating...';
+            
+            // Request new keypair
+            fetch('/api/config/generate_keypair', {
+                method: 'GET'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.private_key && data.public_key) {
+                    document.getElementById('localPrivateKey').value = data.private_key;
+                    
+                    // Display a notification with the public key
+                    const alert = document.createElement('div');
+                    alert.className = 'alert alert-info alert-dismissible fade show mt-3';
+                    alert.innerHTML = `
+                        <h6 class="alert-heading">Key Pair Generated!</h6>
+                        <p>Your public key is: <code>${data.public_key}</code></p>
+                        <p class="mb-0">Add this public key to your AWS WireGuard server configuration.</p>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    `;
+                    configForm.prepend(alert);
+                } else {
+                    alert('Failed to generate key pair.');
+                }
+                
+                // Reset button state
+                generateKeyBtn.disabled = false;
+                generateKeyBtn.innerHTML = '<i class="fas fa-sync-alt"></i> Generate';
+            })
+            .catch(error => {
+                console.error('Error generating keypair:', error);
+                alert('Error generating keypair. Check the console for details.');
+                
+                // Reset button state
+                generateKeyBtn.disabled = false;
+                generateKeyBtn.innerHTML = '<i class="fas fa-sync-alt"></i> Generate';
+            });
+        });
+        
+        // Form submission
+        configForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            // Get form values
+            const configData = {
+                aws_endpoint: document.getElementById('awsEndpoint').value,
+                aws_public_key: document.getElementById('awsPublicKey').value,
+                local_private_key: document.getElementById('localPrivateKey').value,
+                local_ip: document.getElementById('localIP').value,
+                dns: document.getElementById('dns').value,
+                keep_alive: parseInt(document.getElementById('keepAlive').value) || 25,
+                auto_reconnect: document.getElementById('autoReconnect').checked
+            };
+            
+            // Show loading state
+            const saveBtn = document.getElementById('saveBtn');
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Saving...';
+            
+            // Submit data
+            fetch('/api/config/update', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(configData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Create success alert
+                    const alert = document.createElement('div');
+                    alert.className = 'alert alert-success alert-dismissible fade show mt-3';
+                    alert.innerHTML = `
+                        <h6 class="alert-heading">Configuration Saved!</h6>
+                        <p>Your VPN tunnel configuration has been updated successfully.</p>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    `;
+                    configForm.prepend(alert);
+                } else {
+                    // Create error alert
+                    const alert = document.createElement('div');
+                    alert.className = 'alert alert-danger alert-dismissible fade show mt-3';
+                    alert.innerHTML = `
+                        <h6 class="alert-heading">Error Saving Configuration</h6>
+                        <p>${data.error || 'An unknown error occurred.'}</p>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    `;
+                    configForm.prepend(alert);
+                }
+                
+                // Reset button state
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = '<i class="fas fa-save me-2"></i>Save Configuration';
+            })
+            .catch(error => {
+                console.error('Error saving configuration:', error);
+                
+                // Create error alert
+                const alert = document.createElement('div');
+                alert.className = 'alert alert-danger alert-dismissible fade show mt-3';
+                alert.innerHTML = `
+                    <h6 class="alert-heading">Error Saving Configuration</h6>
+                    <p>An error occurred while saving the configuration. Check the console for details.</p>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                `;
+                configForm.prepend(alert);
+                
+                // Reset button state
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = '<i class="fas fa-save me-2"></i>Save Configuration';
+            });
+        });
+        
+        // Reset form
+        resetBtn.addEventListener('click', () => {
+            if (confirm('Are you sure you want to reset the form? Any unsaved changes will be lost.')) {
+                window.location.reload();
+            }
+        });
+    });
+</script>
+{% endblock %}

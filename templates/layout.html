@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AWS VPN Tunnel Manager</title>
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css">
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- Chart.js for graphs -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Custom styles -->
+    <style>
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 5px;
+        }
+        .status-connected {
+            background-color: var(--bs-success);
+        }
+        .status-disconnected {
+            background-color: var(--bs-danger);
+        }
+        .nav-link.active {
+            font-weight: bold;
+            border-left: 3px solid var(--bs-primary);
+            padding-left: 12px !important;
+        }
+        .stats-card {
+            transition: transform 0.2s;
+        }
+        .stats-card:hover {
+            transform: translateY(-5px);
+        }
+        .main-content {
+            min-height: calc(100vh - 60px);
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <div class="col-lg-2 col-md-3 bg-dark p-0">
+                <div class="d-flex flex-column p-3 text-white bg-dark" style="min-height: 100vh;">
+                    <a href="/" class="d-flex align-items-center mb-3 mb-md-0 me-md-auto text-white text-decoration-none">
+                        <span class="fs-4">VPN Tunnel</span>
+                    </a>
+                    <hr>
+                    <ul class="nav nav-pills flex-column mb-auto">
+                        <li class="nav-item">
+                            <a href="/" class="nav-link text-white {{ 'active' if request.path == '/' else '' }}">
+                                <i class="fas fa-home me-2"></i>
+                                Dashboard
+                            </a>
+                        </li>
+                        <li>
+                            <a href="/stats" class="nav-link text-white {{ 'active' if request.path == '/stats' else '' }}">
+                                <i class="fas fa-chart-line me-2"></i>
+                                Statistics
+                            </a>
+                        </li>
+                        <li>
+                            <a href="/setup" class="nav-link text-white {{ 'active' if request.path == '/setup' else '' }}">
+                                <i class="fas fa-cogs me-2"></i>
+                                Configuration
+                            </a>
+                        </li>
+                    </ul>
+                    <hr>
+                    <div class="dropdown">
+                        <div class="d-flex align-items-center text-white text-decoration-none">
+                            <div id="tunnelStatusIcon" class="status-indicator status-disconnected"></div>
+                            <span id="tunnelStatusText">Disconnected</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Main content -->
+            <div class="col-lg-10 col-md-9 p-4 main-content">
+                <!-- Flash messages -->
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                  {% if messages %}
+                    {% for category, message in messages %}
+                      <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                      </div>
+                    {% endfor %}
+                  {% endif %}
+                {% endwith %}
+                
+                <!-- Page content -->
+                {% block content %}{% endblock %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Common JS -->
+    <script>
+        // Function to update tunnel status indicator
+        function updateTunnelStatus() {
+            fetch('/api/tunnel/status')
+                .then(response => response.json())
+                .then(data => {
+                    const statusIcon = document.getElementById('tunnelStatusIcon');
+                    const statusText = document.getElementById('tunnelStatusText');
+                    
+                    if (data.running) {
+                        statusIcon.className = 'status-indicator status-connected';
+                        statusText.textContent = 'Connected';
+                    } else {
+                        statusIcon.className = 'status-indicator status-disconnected';
+                        statusText.textContent = 'Disconnected';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching tunnel status:', error);
+                });
+        }
+        
+        // Update tunnel status on page load and every 10 seconds
+        document.addEventListener('DOMContentLoaded', () => {
+            updateTunnelStatus();
+            setInterval(updateTunnelStatus, 10000);
+        });
+    </script>
+    
+    {% block scripts %}{% endblock %}
+</body>
+</html>

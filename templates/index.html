@@ -1,0 +1,352 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4 align-items-center">
+        <div class="col-md-8">
+            <h1>VPN Tunnel Dashboard</h1>
+            <p class="lead">Connect your local PC to AWS for improved internet performance</p>
+        </div>
+        <div class="col-md-4 text-end">
+            {% if tunnel_status.running %}
+            <button id="stopTunnelBtn" class="btn btn-danger">
+                <i class="fas fa-stop-circle me-2"></i>Stop Tunnel
+            </button>
+            {% else %}
+            <button id="startTunnelBtn" class="btn btn-success">
+                <i class="fas fa-play-circle me-2"></i>Start Tunnel
+            </button>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Connection Status Card -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">Connection Status</h5>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <span class="text-muted">Status:</span>
+                                <span class="ms-2 fw-bold">
+                                    {% if tunnel_status.running %}
+                                    <span class="text-success">
+                                        <i class="fas fa-check-circle me-1"></i>Connected
+                                    </span>
+                                    {% else %}
+                                    <span class="text-danger">
+                                        <i class="fas fa-times-circle me-1"></i>Disconnected
+                                    </span>
+                                    {% endif %}
+                                </span>
+                            </div>
+                            
+                            {% if tunnel_status.running %}
+                            <div class="mb-3">
+                                <span class="text-muted">Uptime:</span>
+                                <span class="ms-2" id="uptime">{{ tunnel_status.uptime or 'N/A' }}</span>
+                            </div>
+                            <div class="mb-3">
+                                <span class="text-muted">Last Handshake:</span>
+                                <span class="ms-2" id="lastHandshake">{{ tunnel_status.last_handshake or 'N/A' }}</span>
+                            </div>
+                            {% endif %}
+                            
+                            <div class="mb-3">
+                                <span class="text-muted">Local IP:</span>
+                                <span class="ms-2">{{ tunnel_status.local_ip or 'Not configured' }}</span>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            {% if tunnel_status.running %}
+                            <div class="mb-3">
+                                <span class="text-muted">Endpoint:</span>
+                                <span class="ms-2" id="endpoint">{{ tunnel_status.endpoint or 'N/A' }}</span>
+                            </div>
+                            <div class="mb-3">
+                                <span class="text-muted">Data Received:</span>
+                                <span class="ms-2" id="dataReceived">
+                                    {{ (tunnel_status.transfer_rx / (1024*1024))|round(2) }} MB
+                                </span>
+                            </div>
+                            <div class="mb-3">
+                                <span class="text-muted">Data Sent:</span>
+                                <span class="ms-2" id="dataSent">
+                                    {{ (tunnel_status.transfer_tx / (1024*1024))|round(2) }} MB
+                                </span>
+                            </div>
+                            {% else %}
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle me-2"></i>
+                                Start the tunnel to connect to your AWS instance and maximize your internet speed.
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Statistics Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm stats-card">
+                <div class="card-body text-center">
+                    <h6 class="text-uppercase text-muted">Download Speed</h6>
+                    <h2 class="display-5 fw-bold" id="downloadSpeed">
+                        {{ "%.2f"|format(stats.download_speed) }} Mbps
+                    </h2>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm stats-card">
+                <div class="card-body text-center">
+                    <h6 class="text-uppercase text-muted">Upload Speed</h6>
+                    <h2 class="display-5 fw-bold" id="uploadSpeed">
+                        {{ "%.2f"|format(stats.upload_speed) }} Mbps
+                    </h2>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm stats-card">
+                <div class="card-body text-center">
+                    <h6 class="text-uppercase text-muted">Latency</h6>
+                    <h2 class="display-5 fw-bold" id="latency">
+                        {{ "%.0f"|format(stats.latency) }} ms
+                    </h2>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm stats-card">
+                <div class="card-body text-center">
+                    <h6 class="text-uppercase text-muted">Packet Loss</h6>
+                    <h2 class="display-5 fw-bold" id="packetLoss">
+                        {{ "%.1f"|format(stats.packet_loss) }}%
+                    </h2>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Throughput Chart -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">Network Throughput</h5>
+                    <canvas id="throughputChart" width="400" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Quick Setup Reminder (if not configured) -->
+    {% if not tunnel_status.aws_public_key %}
+    <div class="row">
+        <div class="col-12">
+            <div class="alert alert-warning">
+                <h5><i class="fas fa-exclamation-triangle me-2"></i>Setup Required</h5>
+                <p>Your tunnel is not fully configured yet. Please go to the <a href="/setup" class="alert-link">Configuration</a> page to set up your AWS endpoint details.</p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/chart_utils.js"></script>
+<script>
+    // Initialize throughput chart
+    let throughputChart;
+    const throughputData = {
+        labels: [],
+        datasets: [
+            {
+                label: 'Download (Mbps)',
+                borderColor: '#36a2eb',
+                backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                data: [],
+                fill: true,
+            },
+            {
+                label: 'Upload (Mbps)',
+                borderColor: '#ff6384',
+                backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                data: [],
+                fill: true,
+            }
+        ]
+    };
+    
+    // Function to update stats
+    function updateStats() {
+        fetch('/api/stats/current')
+            .then(response => response.json())
+            .then(data => {
+                // Update stats cards
+                document.getElementById('downloadSpeed').textContent = `${data.download_speed.toFixed(2)} Mbps`;
+                document.getElementById('uploadSpeed').textContent = `${data.upload_speed.toFixed(2)} Mbps`;
+                document.getElementById('latency').textContent = `${Math.round(data.latency)} ms`;
+                document.getElementById('packetLoss').textContent = `${data.packet_loss.toFixed(1)}%`;
+                
+                // Add data to chart
+                const timestamp = new Date(data.timestamp);
+                const timeStr = timestamp.toLocaleTimeString();
+                
+                throughputData.labels.push(timeStr);
+                throughputData.datasets[0].data.push(data.download_speed);
+                throughputData.datasets[1].data.push(data.upload_speed);
+                
+                // Keep only the last 30 data points
+                if (throughputData.labels.length > 30) {
+                    throughputData.labels.shift();
+                    throughputData.datasets.forEach(dataset => dataset.data.shift());
+                }
+                
+                // Update chart
+                throughputChart.update();
+            })
+            .catch(error => {
+                console.error('Error fetching stats:', error);
+            });
+            
+        // Update tunnel status
+        updateTunnelStatus();
+    }
+    
+    // Function to update connection details
+    function updateConnectionDetails() {
+        fetch('/api/tunnel/status')
+            .then(response => response.json())
+            .then(data => {
+                if (data.running) {
+                    document.getElementById('uptime').textContent = data.uptime || 'N/A';
+                    document.getElementById('lastHandshake').textContent = data.last_handshake || 'N/A';
+                    document.getElementById('endpoint').textContent = data.endpoint || 'N/A';
+                    document.getElementById('dataReceived').textContent = `${((data.transfer_rx || 0) / (1024*1024)).toFixed(2)} MB`;
+                    document.getElementById('dataSent').textContent = `${((data.transfer_tx || 0) / (1024*1024)).toFixed(2)} MB`;
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching tunnel status:', error);
+            });
+    }
+    
+    // Tunnel control buttons
+    document.addEventListener('DOMContentLoaded', () => {
+        // Initialize chart
+        const ctx = document.getElementById('throughputChart').getContext('2d');
+        throughputChart = new Chart(ctx, {
+            type: 'line',
+            data: throughputData,
+            options: {
+                responsive: true,
+                scales: {
+                    x: {
+                        display: true,
+                        title: {
+                            display: true,
+                            text: 'Time'
+                        }
+                    },
+                    y: {
+                        display: true,
+                        title: {
+                            display: true,
+                            text: 'Speed (Mbps)'
+                        },
+                        min: 0
+                    }
+                }
+            }
+        });
+        
+        // Start button event listener
+        const startBtn = document.getElementById('startTunnelBtn');
+        if (startBtn) {
+            startBtn.addEventListener('click', () => {
+                startBtn.disabled = true;
+                startBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Starting...';
+                
+                fetch('/api/tunnel/toggle', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        action: 'start'
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        window.location.reload();
+                    } else {
+                        alert('Failed to start tunnel: ' + data.error);
+                        startBtn.disabled = false;
+                        startBtn.innerHTML = '<i class="fas fa-play-circle me-2"></i>Start Tunnel';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error starting tunnel:', error);
+                    startBtn.disabled = false;
+                    startBtn.innerHTML = '<i class="fas fa-play-circle me-2"></i>Start Tunnel';
+                });
+            });
+        }
+        
+        // Stop button event listener
+        const stopBtn = document.getElementById('stopTunnelBtn');
+        if (stopBtn) {
+            stopBtn.addEventListener('click', () => {
+                stopBtn.disabled = true;
+                stopBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Stopping...';
+                
+                fetch('/api/tunnel/toggle', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        action: 'stop'
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        window.location.reload();
+                    } else {
+                        alert('Failed to stop tunnel: ' + data.error);
+                        stopBtn.disabled = false;
+                        stopBtn.innerHTML = '<i class="fas fa-stop-circle me-2"></i>Stop Tunnel';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error stopping tunnel:', error);
+                    stopBtn.disabled = false;
+                    stopBtn.innerHTML = '<i class="fas fa-stop-circle me-2"></i>Stop Tunnel';
+                });
+            });
+        }
+        
+        // Update stats initially and every 5 seconds
+        updateStats();
+        setInterval(updateStats, 5000);
+        
+        // Update connection details every 10 seconds
+        updateConnectionDetails();
+        setInterval(updateConnectionDetails, 10000);
+    });
+</script>
+{% endblock %}

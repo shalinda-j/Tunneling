@@ -1,0 +1,357 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container">
+    <h1 class="mb-4">Connection Statistics</h1>
+    
+    <!-- Time Range Selection -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">Select Time Range</h5>
+                    <div class="btn-group" role="group" aria-label="Time range selection">
+                        <button type="button" class="btn btn-outline-primary time-range-btn active" data-hours="1">1 Hour</button>
+                        <button type="button" class="btn btn-outline-primary time-range-btn" data-hours="6">6 Hours</button>
+                        <button type="button" class="btn btn-outline-primary time-range-btn" data-hours="12">12 Hours</button>
+                        <button type="button" class="btn btn-outline-primary time-range-btn" data-hours="24">24 Hours</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">Connection Status</h5>
+                    <div class="d-flex align-items-center">
+                        <div class="status-indicator {{ 'status-connected' if tunnel_status.running else 'status-disconnected' }} me-2"></div>
+                        <span class="fw-bold">{{ 'Connected' if tunnel_status.running else 'Disconnected' }}</span>
+                        {% if tunnel_status.running %}
+                        <span class="ms-3 text-muted">Uptime: {{ tunnel_status.uptime or 'N/A' }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Throughput Charts -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">Throughput Over Time</h5>
+                    <canvas id="throughputChart" width="400" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Latency and Packet Loss Charts -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">Latency Over Time</h5>
+                    <canvas id="latencyChart" width="400" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">Packet Loss Over Time</h5>
+                    <canvas id="packetLossChart" width="400" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Current Stats -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-transparent">
+                    <h5 class="mb-0">Current Statistics</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <span class="text-muted">Download Speed:</span>
+                                <span class="ms-2 fw-bold" id="currentDownload">{{ "%.2f"|format(stats.download_speed) }} Mbps</span>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <span class="text-muted">Upload Speed:</span>
+                                <span class="ms-2 fw-bold" id="currentUpload">{{ "%.2f"|format(stats.upload_speed) }} Mbps</span>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <span class="text-muted">Latency:</span>
+                                <span class="ms-2 fw-bold" id="currentLatency">{{ "%.0f"|format(stats.latency) }} ms</span>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <span class="text-muted">Packet Loss:</span>
+                                <span class="ms-2 fw-bold" id="currentPacketLoss">{{ "%.1f"|format(stats.packet_loss) }}%</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <span class="text-muted">Total Data Received:</span>
+                                <span class="ms-2 fw-bold">{{ (stats.bytes_received / (1024*1024))|round(2) }} MB</span>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <span class="text-muted">Total Data Sent:</span>
+                                <span class="ms-2 fw-bold">{{ (stats.bytes_sent / (1024*1024))|round(2) }} MB</span>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <span class="text-muted">Tunnel Overhead:</span>
+                                <span class="ms-2 fw-bold">{{ "%.1f"|format(stats.tunnel_overhead) }}%</span>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <span class="text-muted">Last Updated:</span>
+                                <span class="ms-2" id="lastUpdated">
+                                    {% if stats.timestamp %}
+                                        {{ stats.timestamp.split('T')[1].split('.')[0] if 'T' in stats.timestamp else stats.timestamp }}
+                                    {% else %}
+                                        N/A
+                                    {% endif %}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/chart_utils.js"></script>
+<script>
+    // Initialize charts
+    let throughputChart, latencyChart, packetLossChart;
+    let currentHours = 1; // Default time range
+    
+    // Function to format timestamps
+    function formatTimestamp(isoString) {
+        const date = new Date(isoString);
+        return date.toLocaleTimeString();
+    }
+    
+    // Function to load stats history and update charts
+    function loadStatsHistory(hours) {
+        fetch(`/api/stats/history?hours=${hours}`)
+            .then(response => response.json())
+            .then(data => {
+                // Process the data for charts
+                const labels = data.map(entry => formatTimestamp(entry.timestamp));
+                const downloadData = data.map(entry => entry.download_speed);
+                const uploadData = data.map(entry => entry.upload_speed);
+                const latencyData = data.map(entry => entry.latency);
+                const packetLossData = data.map(entry => entry.packet_loss);
+                
+                // Update throughput chart
+                throughputChart.data.labels = labels;
+                throughputChart.data.datasets[0].data = downloadData;
+                throughputChart.data.datasets[1].data = uploadData;
+                throughputChart.update();
+                
+                // Update latency chart
+                latencyChart.data.labels = labels;
+                latencyChart.data.datasets[0].data = latencyData;
+                latencyChart.update();
+                
+                // Update packet loss chart
+                packetLossChart.data.labels = labels;
+                packetLossChart.data.datasets[0].data = packetLossData;
+                packetLossChart.update();
+            })
+            .catch(error => {
+                console.error('Error loading stats history:', error);
+            });
+    }
+    
+    // Function to update current stats
+    function updateCurrentStats() {
+        fetch('/api/stats/current')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('currentDownload').textContent = `${data.download_speed.toFixed(2)} Mbps`;
+                document.getElementById('currentUpload').textContent = `${data.upload_speed.toFixed(2)} Mbps`;
+                document.getElementById('currentLatency').textContent = `${Math.round(data.latency)} ms`;
+                document.getElementById('currentPacketLoss').textContent = `${data.packet_loss.toFixed(1)}%`;
+                
+                const timestamp = new Date(data.timestamp);
+                document.getElementById('lastUpdated').textContent = timestamp.toLocaleTimeString();
+            })
+            .catch(error => {
+                console.error('Error updating current stats:', error);
+            });
+    }
+    
+    document.addEventListener('DOMContentLoaded', () => {
+        // Initialize throughput chart
+        const throughputCtx = document.getElementById('throughputChart').getContext('2d');
+        throughputChart = new Chart(throughputCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    {
+                        label: 'Download (Mbps)',
+                        borderColor: '#36a2eb',
+                        backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                        data: [],
+                        fill: true,
+                    },
+                    {
+                        label: 'Upload (Mbps)',
+                        borderColor: '#ff6384',
+                        backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                        data: [],
+                        fill: true,
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    x: {
+                        display: true,
+                        title: {
+                            display: true,
+                            text: 'Time'
+                        }
+                    },
+                    y: {
+                        display: true,
+                        title: {
+                            display: true,
+                            text: 'Speed (Mbps)'
+                        },
+                        min: 0
+                    }
+                }
+            }
+        });
+        
+        // Initialize latency chart
+        const latencyCtx = document.getElementById('latencyChart').getContext('2d');
+        latencyChart = new Chart(latencyCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    {
+                        label: 'Latency (ms)',
+                        borderColor: '#4bc0c0',
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        data: [],
+                        fill: true,
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    x: {
+                        display: true,
+                        title: {
+                            display: true,
+                            text: 'Time'
+                        }
+                    },
+                    y: {
+                        display: true,
+                        title: {
+                            display: true,
+                            text: 'Latency (ms)'
+                        },
+                        min: 0
+                    }
+                }
+            }
+        });
+        
+        // Initialize packet loss chart
+        const packetLossCtx = document.getElementById('packetLossChart').getContext('2d');
+        packetLossChart = new Chart(packetLossCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    {
+                        label: 'Packet Loss (%)',
+                        borderColor: '#ffcd56',
+                        backgroundColor: 'rgba(255, 205, 86, 0.2)',
+                        data: [],
+                        fill: true,
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    x: {
+                        display: true,
+                        title: {
+                            display: true,
+                            text: 'Time'
+                        }
+                    },
+                    y: {
+                        display: true,
+                        title: {
+                            display: true,
+                            text: 'Packet Loss (%)'
+                        },
+                        min: 0,
+                        max: 100
+                    }
+                }
+            }
+        });
+        
+        // Load initial data
+        loadStatsHistory(currentHours);
+        
+        // Set up time range buttons
+        const timeRangeButtons = document.querySelectorAll('.time-range-btn');
+        timeRangeButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                // Update active button
+                timeRangeButtons.forEach(btn => btn.classList.remove('active'));
+                button.classList.add('active');
+                
+                // Update time range and reload data
+                currentHours = parseInt(button.dataset.hours);
+                loadStatsHistory(currentHours);
+            });
+        });
+        
+        // Update stats periodically
+        updateCurrentStats();
+        setInterval(updateCurrentStats, 5000);
+        
+        // Refresh chart data periodically
+        setInterval(() => {
+            loadStatsHistory(currentHours);
+        }, 60000); // Refresh every minute
+    });
+</script>
+{% endblock %}
