@@ -9,6 +9,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const runCommandBtn = document.getElementById('runCommandBtn');
     const clearTerminalBtn = document.getElementById('clearTerminalBtn');
     
+    // Safety check to ensure elements exist
+    if (!terminal || !terminalOutput || !commandInput || !runCommandBtn || !clearTerminalBtn) {
+        console.error('One or more terminal elements not found');
+        return;
+    }
+    
     // Command history functionality
     let commandHistory = [];
     let historyIndex = -1;
