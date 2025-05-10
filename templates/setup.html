@@ -128,6 +128,46 @@
         </div>
     </div>
     
+    <!-- Direct Tunnel Configuration -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-transparent">
+                    <h5 class="mb-0">Direct Tunnel Configuration</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-primary">
+                        <h6><i class="fas fa-route me-2"></i>Configure Direct AWS Tunneling (No Third-Party ISP)</h6>
+                        <p>Enable direct routing through AWS without third-party ISP involvement after initial setup.</p>
+                    </div>
+                    
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" id="directTunnel" checked>
+                        <label class="form-check-label" for="directTunnel">
+                            <strong>Use Full Tunnel Mode</strong> - Route all traffic through AWS (recommended)
+                        </label>
+                        <div class="form-text">This ensures all your internet traffic goes directly through AWS, bypassing local ISP routing.</div>
+                    </div>
+                    
+                    <div class="card bg-light mb-3">
+                        <div class="card-body">
+                            <h6 class="card-title"><i class="fas fa-map-signs me-2"></i>How Direct Tunneling Works</h6>
+                            <p>With full tunnel mode enabled:</p>
+                            <ul>
+                                <li>Your local PC establishes a secure WireGuard connection directly to AWS</li>
+                                <li>All internet traffic is routed through the AWS EC2 instance</li>
+                                <li>This bypasses slow or inefficient routing from your local ISP</li>
+                                <li>Your traffic benefits from AWS's global network infrastructure</li>
+                                <li>No third-party ISP configuration is needed after initial setup</li>
+                            </ul>
+                            <p class="card-text small mb-0">Note: You still need internet access from your ISP to establish the initial connection, but all routing decisions will be handled by the tunnel afterward.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- AWS Setup Instructions -->
     <div class="row">
         <div class="col-12">
@@ -281,7 +321,8 @@ AllowedIPs = 10.0.0.2/32
                 local_ip: document.getElementById('localIP').value,
                 dns: document.getElementById('dns').value,
                 keep_alive: parseInt(document.getElementById('keepAlive').value) || 25,
-                auto_reconnect: document.getElementById('autoReconnect').checked
+                auto_reconnect: document.getElementById('autoReconnect').checked,
+                direct_tunnel: document.getElementById('directTunnel').checked
             };
             
             // Show loading state

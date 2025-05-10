@@ -113,7 +113,8 @@ class WireGuardManager:
             "last_connection": None,
             "connection_count": 0,
             "auto_reconnect": True,
-            "keep_alive": 25
+            "keep_alive": 25,
+            "direct_tunnel": True  # Default to full tunnel mode for direct AWS connection
         }
         self._save_settings()
     
@@ -173,7 +174,20 @@ class WireGuardManager:
             # Add peer (AWS server)
             if self.settings["aws_public_key"] and self.settings["aws_endpoint"]:
                 wg_conf.add_peer(self.settings["aws_public_key"])
-                wg_conf.add_attr(self.settings["aws_public_key"], "AllowedIPs", "0.0.0.0/0")
+                
+                # Configure AllowedIPs based on direct_tunnel setting
+                # When direct_tunnel is True, route ALL traffic through the tunnel (0.0.0.0/0)
+                # When direct_tunnel is False, only route tunnel subnet traffic (10.0.0.0/24)
+                if self.settings.get("direct_tunnel", True):
+                    # Full tunnel mode - route everything through AWS
+                    wg_conf.add_attr(self.settings["aws_public_key"], "AllowedIPs", "0.0.0.0/0")
+                    logger.info("Configuring for full tunnel mode (direct AWS connection)")
+                else:
+                    # Split tunnel mode - only route tunnel subnet traffic
+                    tunnel_network = '.'.join(self.settings["local_ip"].split('.')[:3]) + '.0/24'
+                    wg_conf.add_attr(self.settings["aws_public_key"], "AllowedIPs", tunnel_network)
+                    logger.info(f"Configuring for split tunnel mode (subnet only: {tunnel_network})")
+                
                 wg_conf.add_attr(self.settings["aws_public_key"], "Endpoint", self.settings["aws_endpoint"])
                 wg_conf.add_attr(self.settings["aws_public_key"], "PersistentKeepalive", str(self.settings["keep_alive"]))
             
