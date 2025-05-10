@@ -108,8 +108,18 @@ function createCharts() {
 // Refresh tunnel status information
 function refreshTunnelStatus() {
     fetch('/api/tunnel/status')
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+            return response.json();
+        })
         .then(data => {
+            // Check if data is valid
+            if (!data) {
+                throw new Error('Empty response received');
+            }
+            
             // Update stored tunnel status
             tunnelStatus = data;
             
@@ -118,6 +128,21 @@ function refreshTunnelStatus() {
         })
         .catch(error => {
             console.error('Error fetching tunnel status:', error);
+            
+            // Set default values for tunnel status if there's an error
+            tunnelStatus = {
+                running: false,
+                uptime: "N/A",
+                endpoint: "Not connected",
+                transfer_rx: 0,
+                transfer_tx: 0,
+                aws_public_key: "",
+                local_ip: "",
+                available: false
+            };
+            
+            // Still update UI with default values
+            updateTunnelStatusUI();
         });
 }
 
@@ -177,8 +202,18 @@ function updateTunnelStatusUI() {
 // Refresh network statistics
 function refreshStats() {
     fetch('/api/stats/current')
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+            return response.json();
+        })
         .then(data => {
+            // Check if data is valid
+            if (!data) {
+                throw new Error('Empty response received');
+            }
+            
             // Update stats UI elements
             updateStatsUI(data);
             
@@ -187,6 +222,22 @@ function refreshStats() {
         })
         .catch(error => {
             console.error('Error fetching network stats:', error);
+            
+            // Use default stats values on error
+            const defaultStats = {
+                upload_speed: 0,
+                download_speed: 0,
+                latency: 0,
+                packet_loss: 0,
+                bytes_sent: 0,
+                bytes_received: 0,
+                tunnel_overhead: 0,
+                timestamp: new Date().toISOString()
+            };
+            
+            // Update UI with default values
+            updateStatsUI(defaultStats);
+            updateThroughputChart(defaultStats);
         });
 }
 
