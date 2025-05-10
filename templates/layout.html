@@ -76,6 +76,12 @@
                                 Command Terminal
                             </a>
                         </li>
+                        <li>
+                            <a href="/about" class="nav-link text-white {{ 'active' if request.path == '/about' else '' }}">
+                                <i class="fas fa-info-circle me-2"></i>
+                                About
+                            </a>
+                        </li>
                     </ul>
                     <hr>
                     <div class="dropdown">
@@ -83,6 +89,11 @@
                             <div id="tunnelStatusIcon" class="status-indicator status-disconnected"></div>
                             <span id="tunnelStatusText">Disconnected</span>
                         </div>
+                    </div>
+                    <div class="mt-auto text-white-50 small pt-3">
+                        <p>© 2025 WEE Technology Solutions Ltd.</p>
+                        <p>Author: Shalinda Jayasinghe</p>
+                        <p>Licensed under MIT</p>
                     </div>
                 </div>
             </div>

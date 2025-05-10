@@ -100,6 +100,11 @@ def terminal():
     """Terminal page for command line access"""
     return render_template('terminal.html')
 
+@app.route('/about')
+def about():
+    """About page with project and author information"""
+    return render_template('about.html')
+
 @app.route('/api/config')
 def get_config():
     """API endpoint to get the current configuration"""
