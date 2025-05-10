@@ -74,7 +74,7 @@ def toggle_tunnel():
 @app.route('/api/config/update', methods=['POST'])
 def update_config():
     """API endpoint to update WireGuard configuration"""
-    config_data = request.json
+    config_data = request.json if request.json else {}
     result = wg_manager.update_config(config_data)
     
     if result['success']:
